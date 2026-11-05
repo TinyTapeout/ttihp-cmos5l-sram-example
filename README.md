@@ -4,6 +4,8 @@
 
 A minimal Tiny Tapeout project that integrates the IHP `RM_IHPSG13_1P_256x16_c2_bm_bist` SRAM macro (256 x 16 bits) on the IHP SG13CMOS5L process.
 
+**Caveat:** this design has not been proven in silicon yet. Until it has, treat the SRAM power scheme as experimental.
+
 - [How to use the design](docs/info.md)
 
 ## How the SRAM is integrated
@@ -35,8 +37,10 @@ To add the SRAM to your own SG13CMOS5L project (started from the [ttihp-verilog-
 1. Copy `librelane_plugin_sram_pdn.py` and `odb_stripes.py` to the root of your repository, and `src/pdn_cfg.tcl` and `src/sram_bb.v` to your `src` directory. Add `sram_bb.v` to `source_files` in `info.yaml` and to `PROJECT_SOURCES` in `test/Makefile`.
 2. Copy the "IHP SRAM macro" section of [src/config.json](src/config.json) (from `meta` to `ERROR_ON_ILLEGAL_OVERLAPS`) and the `FP_PDN_VPITCH`, `FP_PDN_VWIDTH`, `FP_PDN_VSPACING` and `FP_PDN_VOFFSET` values. They match the stripes to the macro's power columns. The stripe width (2.1 um) must fit inside the 2.81 um columns.
 3. Instantiate the macro like [src/project.v](src/project.v) does: tie `A_DLY` high, tie off the BIST ports, and drive the macro's inputs from registers. Use the macro's instance name in `MACROS` and `PDN_MACRO_CONNECTIONS`. If the macro is not a direct child of your top module, this is its hierarchical name after flattening (e.g. `core.mem.sram`).
-4. Place the macro with orientation `N` or `FS` (the stripe step supports only these two), with its pins facing your logic. Preferably keep x = 3.36 + n x 11.24 um: the PDN stripes then land on the left bit-cell array's power columns, so the stripes over the macro stay on the tile's grid pitch. Any other x works too, as the stripe step moves every stripe crossing the macro onto the nearest free column of its polarity. The step log then reports the stripes it moved, which is expected. For another IHP SRAM macro, check its `VDD!` / `VSS!` column positions in its LEF, change the views in `MACROS` and the port list in `src/sram_bb.v`, replace the macro's wrapper in `test/sram_model` with that macro's wrapper from the PDK's `verilog` directory, and pick a tile size that fits it.
-5. For simulation, copy `test/sram_model` and the `SRAM_MODEL` and `COMPILE_ARGS` lines of [test/Makefile](test/Makefile).
+4. Place the macro with orientation `N` or `FS` (the stripe step supports only these two), with its pins facing your logic. Preferably keep x = 3.36 + n x 11.24 um: the PDN stripes then land on the left bit-cell array's power columns, so the stripes over the macro stay on the tile's grid pitch. Any other x works too, as the stripe step moves every stripe crossing the macro onto the nearest free column of its polarity. The step log then reports the stripes it moved, which is expected.
+5. For more than one instance of the macro, add each one under `instances` in `MACROS` and give it its own two lines in `PDN_MACRO_CONNECTIONS`. Instances placed side by side each get their own stripes, so step 4 applies to each x. Instances stacked above each other must have the same x, so that their power columns line up: the stripes run the full height of the tile and would otherwise cross the other instance off its columns.
+6. For simulation, copy `test/sram_model` and the `SRAM_MODEL` and `COMPILE_ARGS` lines of [test/Makefile](test/Makefile).
+7. For another IHP SRAM macro, check its `VDD!` / `VSS!` column positions in its LEF, change the views in `MACROS` and the port list in `src/sram_bb.v`, replace the macro's wrapper in `test/sram_model` with that macro's wrapper from the PDK's `verilog` directory, and pick a tile size that fits it.
 
 After hardening, check that the macro is powered: the `*-project-extendpowerstripes` step log lists the stripes it put on the macro, LVS must match, and the IR drop report (`runs/wokwi/*-openroad-irdropreport/irdrop.rpt`) must say that all shapes on VPWR and VGND are connected.
 
